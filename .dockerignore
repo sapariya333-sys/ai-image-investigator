@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+backend/investigator.db
+backend/uploads/*
+backend/derivatives/*
+backend/reports/*
+!backend/uploads/.gitkeep
+!backend/derivatives/.gitkeep
+!backend/reports/.gitkeep
+.git/

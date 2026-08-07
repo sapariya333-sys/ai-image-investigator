@@ -1,0 +1,31 @@
+# Fly.io deployment config.
+# Deploy with: flyctl launch --copy-config --no-deploy   (first time, to create the app)
+# then:        flyctl volumes create investigator_data --size 3 --region <your-region>
+# then:        flyctl deploy
+#
+# App name below is a placeholder — flyctl will prompt you to pick a unique one,
+# or edit `app = "..."` yourself before deploying.
+
+app = "ai-image-investigator"
+primary_region = "bom"  # Mumbai — closest Fly.io region to India as of writing; check `flyctl platform regions`
+
+[build]
+
+[env]
+  DATA_DIR = "/data"
+  PORT = "8080"
+
+[mounts]
+  source = "investigator_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

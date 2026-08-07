@@ -1,0 +1,15 @@
+services:
+  ai-image-investigator:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATA_DIR=/data
+      - INVESTIGATOR_USERNAME=investigator
+      - INVESTIGATOR_PASSWORD=changeme   # CHANGE THIS before exposing publicly
+      - SECRET_KEY=change-this-to-a-random-string
+    volumes:
+      - investigator_data:/data
+
+volumes:
+  investigator_data:

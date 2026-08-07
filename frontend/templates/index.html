@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI-Image Investigator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Ⅲ</div>
+      <div class="brand-text">
+        <div class="brand-title">AI-Image Investigator</div>
+        <div class="brand-sub">Forensic Intelligence Platform</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Cases</div>
+      <button class="btn-new-case" id="btnNewCase">+ New Case</button>
+      <div id="caseList" class="case-list"></div>
+    </div>
+
+    <form method="POST" action="/logout" class="logout-form">
+      <button type="submit" class="btn-logout">Sign Out</button>
+    </form>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- Empty state -->
+    <section id="emptyState" class="empty-state">
+      <div class="seal">EVIDENCE</div>
+      <h1>No case selected</h1>
+      <p>Create or select a case from the left to begin an investigation.</p>
+    </section>
+
+    <!-- Case workspace -->
+    <section id="caseWorkspace" class="case-workspace hidden">
+
+      <header class="case-header">
+        <div>
+          <div class="case-number" id="caseNumberLabel">CASE #—</div>
+          <h1 id="caseTitleLabel">—</h1>
+          <div class="case-meta" id="caseMetaLabel">—</div>
+        </div>
+        <div class="case-header-actions">
+          <label class="btn-upload">
+            Upload Evidence
+            <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,.tiff,.tif,.heic" hidden />
+          </label>
+        </div>
+      </header>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="images">Images</button>
+        <button class="tab" data-tab="metadata">Metadata</button>
+        <button class="tab" data-tab="visual">Visual Analysis</button>
+        <button class="tab" data-tab="search">Search</button>
+        <button class="tab" data-tab="similarity">Similarity</button>
+        <button class="tab" data-tab="manipulation">Manipulation</button>
+        <button class="tab" data-tab="timeline">Timeline</button>
+        <button class="tab" data-tab="report">Report</button>
+      </nav>
+
+      <div class="tab-panels">
+
+        <div class="tab-panel active" id="panel-overview">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">Case Summary</div>
+              <div id="overviewSummary" class="kv-grid"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Evidence at a Glance</div>
+              <div id="overviewStats" class="stat-row"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Investigator Notes</div>
+            <div class="note-form">
+              <input type="text" id="noteInput" placeholder="Add an investigator note for this case..." />
+              <button id="btnAddNote">Add</button>
+            </div>
+            <div id="notesList" class="notes-list"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-images">
+          <div class="image-grid" id="imageGrid"></div>
+        </div>
+
+        <div class="tab-panel" id="panel-metadata">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="metadataImageSelect"></select>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">File Properties &amp; Hashes</div>
+              <div id="fileProps" class="kv-grid mono"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">EXIF Findings</div>
+              <div id="exifFindings" class="kv-grid"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">GPS Findings</div>
+            <div id="gpsFindings" class="kv-grid"></div>
+            <div id="gpsCaveat" class="caveat"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-visual">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="visualImageSelect"></select>
+            <button id="btnRunVisual" class="btn-action">Run AI Visual Investigator</button>
+            <button id="btnRunOcr" class="btn-action">Run OCR</button>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">AI Visual Findings</div>
+              <div id="visualResults" class="kv-grid"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">OCR &amp; Text Intelligence</div>
+              <div id="ocrResults"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Location Assessment</div>
+            <button id="btnRunLocation" class="btn-action">Assess Location</button>
+            <div id="locationResults"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-search">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="searchImageSelect"></select>
+            <button id="btnGetSearchLinks" class="btn-action">Build Reverse-Search Links</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Reverse Image Search Hub</div>
+            <div id="searchLinks" class="search-links"></div>
+            <div class="caveat" id="searchNote"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-similarity">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="similarityImageSelect"></select>
+            <button id="btnRunSimilarity" class="btn-action">Find Duplicates / Similar</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Exact Duplicates</div>
+            <div id="exactDuplicates"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Visually Similar Images</div>
+            <div id="similarImages"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-manipulation">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="manipulationImageSelect"></select>
+            <button id="btnRunManipulation" class="btn-action">Run Authenticity Analysis</button>
+            <button id="btnRunSynthetic" class="btn-action">Run Synthetic Media Screen</button>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-title">Manipulation Indicators</div>
+              <div id="manipulationSummary" class="assessment-banner"></div>
+              <div id="manipulationIndicators"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Synthetic Media Screening</div>
+              <div id="syntheticResults" class="kv-grid"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Enhancement Lab</div>
+            <div class="preset-row">
+              <button class="btn-preset" data-preset="enhance_face">Enhance Face</button>
+              <button class="btn-preset" data-preset="enhance_number_plate">Enhance Plate</button>
+              <button class="btn-preset" data-preset="enhance_document">Enhance Document</button>
+              <button class="btn-preset" data-preset="enhance_cctv_frame">Enhance CCTV Frame</button>
+              <button class="btn-preset" data-preset="enhance_text">Enhance Text</button>
+            </div>
+            <div id="derivativesList" class="derivatives-list"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-timeline">
+          <div class="card">
+            <div class="card-title">Evidence Timeline</div>
+            <div id="timelineList" class="timeline"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-report">
+          <div class="selector-row">
+            <label>Selected image:</label>
+            <select id="reportImageSelect"></select>
+            <button id="btnGenerateReport" class="btn-action btn-primary">Generate Forensic Report</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Report Status</div>
+            <div id="reportStatus" class="assessment-banner">No report generated yet for this image.</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

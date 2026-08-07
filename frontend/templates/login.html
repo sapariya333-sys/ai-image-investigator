@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in — AI-Image Investigator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+  .login-shell { height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-card {
+    width: 360px; background: var(--bg-1); border: 1px solid var(--border-soft);
+    border-radius: 6px; padding: 32px 28px;
+  }
+  .login-brand { display:flex; align-items:center; gap:10px; margin-bottom: 22px; }
+  .login-title { font-size: 15px; font-weight: 600; }
+  .login-sub { font-size: 11px; color: var(--text-low); text-transform: uppercase; letter-spacing:.6px; margin-top:2px; }
+  .login-field { margin-bottom: 14px; }
+  .login-field label { display:block; font-size: 11.5px; color: var(--text-low); margin-bottom: 6px; }
+  .login-field input {
+    width: 100%; background: var(--bg-0); border: 1px solid var(--border);
+    color: var(--text-hi); padding: 10px 12px; border-radius: 4px; font-size: 13px;
+  }
+  .login-btn {
+    width: 100%; margin-top: 6px; background: var(--accent); color: #fff; border: none;
+    padding: 11px; border-radius: 4px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+  }
+  .login-btn:hover { background: var(--accent-hi); }
+  .login-error {
+    font-size: 12px; color: var(--red); background: #2a1418; border-left: 2px solid var(--red);
+    padding: 8px 10px; border-radius: 2px; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-mark">Ⅲ</div>
+        <div>
+          <div class="login-title">AI-Image Investigator</div>
+          <div class="login-sub">Restricted Access</div>
+        </div>
+      </div>
+      {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="login-field">
+          <label>Username</label>
+          <input type="text" name="username" autofocus required />
+        </div>
+        <div class="login-field">
+          <label>Password</label>
+          <input type="password" name="password" required />
+        </div>
+        <button type="submit" class="login-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
