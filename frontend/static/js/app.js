@@ -175,7 +175,7 @@ function renderImageGrid() {
     <div class="evidence-card" data-image-id="${img.id}">
       <button class="btn-remove-evidence" data-image-id="${img.id}" title="Remove this evidence">✕</button>
       <div class="evidence-thumb-wrap">
-        <img class="evidence-thumb" src="${API}/images/${img.id}/file" loading="lazy" />
+        <img class="evidence-thumb" src="${API}/images/${img.id}/thumbnail" loading="lazy" />
       </div>
       <div class="evidence-info">
         <div class="evidence-name">${escapeHtml(img.original_filename)}</div>

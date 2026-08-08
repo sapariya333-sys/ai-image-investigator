@@ -1,4 +1,5 @@
 import os
+import io
 import uuid
 from flask import Blueprint, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
@@ -18,6 +19,31 @@ ALLOWED_EXT = {"jpg", "jpeg", "png", "webp", "tiff", "tif", "heic"}
 
 def _allowed(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT
+
+
+def _as_browser_safe_jpeg(path, max_dimension=1200, quality=88):
+    """
+    Re-encodes any supported source format into an in-memory JPEG.
+
+    Chrome, Firefox, and Edge have no built-in HEIC or TIFF decoder for
+    <img> tags -- a correct Content-Type header doesn't change that, the
+    browser simply can't decode the bytes. Reverse-search providers
+    (TinEye confirmed explicitly) reject HEIC outright too. JPEG is the
+    one format every browser and every provider accepts, so anything
+    meant for inline display or an external fetch goes through this
+    first. The original file on disk is never touched -- this only
+    affects what gets served to a *viewer* of the evidence, not the
+    evidence itself.
+    """
+    with Image.open(path) as img:
+        rgb = img.convert("RGB")
+        if max(rgb.size) > max_dimension:
+            ratio = max_dimension / max(rgb.size)
+            rgb = rgb.resize((int(rgb.width * ratio), int(rgb.height * ratio)), Image.LANCZOS)
+        buf = io.BytesIO()
+        rgb.save(buf, format="JPEG", quality=quality)
+        buf.seek(0)
+        return buf
 
 
 @images_bp.route("", methods=["POST"])
@@ -112,17 +138,29 @@ def get_image(image_id):
 
 @images_bp.route("/<int:image_id>/file", methods=["GET"])
 def get_image_file(image_id):
+    """The untouched original evidence file -- byte-for-byte, whatever format it was uploaded in."""
     image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
     if not image:
         return jsonify({"error": "not found"}), 404
     return send_file(image["stored_path"])
 
 
+@images_bp.route("/<int:image_id>/thumbnail", methods=["GET"])
+def get_image_thumbnail(image_id):
+    """Browser-safe JPEG render of the evidence, for inline <img> display (see _as_browser_safe_jpeg)."""
+    image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
+    if not image:
+        return jsonify({"error": "not found"}), 404
+    buf = _as_browser_safe_jpeg(image["stored_path"])
+    return send_file(buf, mimetype="image/jpeg")
+
+
 @images_bp.route("/<int:image_id>/public-file", methods=["GET"])
 def get_public_image_file(image_id):
     """
-    Serves the image WITHOUT requiring a login session -- exempted from
-    the global auth check in app.py (any path ending in /public-file).
+    Serves a browser/provider-safe JPEG WITHOUT requiring a login session
+    -- exempted from the global auth check in app.py (any path ending in
+    /public-file).
 
     This exists only for reverse-image-search providers (Google Lens,
     Bing, etc.), which fetch the URL from their own servers and so can
@@ -130,6 +168,8 @@ def get_public_image_file(image_id):
     15-minute token minted specifically for this image (see
     routes/analysis.py reverse_search_links) -- so it's not a
     permanently open evidence URL, just a short window for one lookup.
+    Always re-encoded to JPEG regardless of source format, since HEIC
+    (and some TIFF variants) aren't accepted by these providers at all.
     """
     token = request.args.get("token", "")
     try:
@@ -147,7 +187,8 @@ def get_public_image_file(image_id):
     image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
     if not image:
         return jsonify({"error": "not found"}), 404
-    return send_file(image["stored_path"])
+    buf = _as_browser_safe_jpeg(image["stored_path"])
+    return send_file(buf, mimetype="image/jpeg")
 
 
 @images_bp.route("/<int:image_id>/enhance", methods=["POST"])
@@ -160,8 +201,12 @@ def enhance_image(image_id):
     preset = data.get("preset")
     ops = data.get("operations", {})
 
-    ext = image["stored_path"].rsplit(".", 1)[1]
-    derivative_name = f"{image['image_uid']}_enhanced_{uuid.uuid4().hex[:6]}.{ext}"
+    # Always save as JPEG regardless of the original's format -- derivatives
+    # are working copies meant to be viewed in-browser, and preserving a
+    # HEIC/TIFF extension here would produce a preview image nothing but
+    # Safari could actually display. enhancement.py already normalizes to
+    # RGB before any operation, so this is a lossless format change only.
+    derivative_name = f"{image['image_uid']}_enhanced_{uuid.uuid4().hex[:6]}.jpg"
     out_path = os.path.join(current_app.config["DERIVATIVE_DIR"], derivative_name)
 
     if preset:
