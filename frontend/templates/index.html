@@ -6,14 +6,17 @@
 <title>AI-Image Investigator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ asset_version('css/style.css') }}">
 </head>
 <body>
 
-<div class="app-shell">
+<div class="app-shell" id="appShell">
+
+  <button id="btnMobileMenu" class="btn-mobile-menu" aria-label="Open menu">☰</button>
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
   <!-- ============ SIDEBAR ============ -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-mark">Ⅲ</div>
       <div class="brand-text">
@@ -153,6 +156,10 @@
             <button id="btnGetSearchLinks" class="btn-action">Build Reverse-Search Links</button>
           </div>
           <div class="card">
+            <div class="card-title">Public Link Preview</div>
+            <div id="searchPreview" class="search-preview-empty">Click "Build Reverse-Search Links" to generate a link and preview.</div>
+          </div>
+          <div class="card">
             <div class="card-title">Reverse Image Search Hub</div>
             <div id="searchLinks" class="search-links"></div>
             <div class="caveat" id="searchNote"></div>
@@ -232,6 +239,6 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v={{ asset_version('js/app.js') }}"></script>
 </body>
 </html>

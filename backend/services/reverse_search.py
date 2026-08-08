@@ -19,10 +19,11 @@ from urllib.parse import quote
 def build_search_links(public_image_url):
     encoded = quote(public_image_url, safe="")
     return {
+        "image_url": public_image_url,
         "google_lens": f"https://lens.google.com/uploadbyurl?url={encoded}",
-        "bing_visual_search": f"https://www.bing.com/images/search?view=detailv2&iss=sbiupload&q=imgurl:{encoded}",
+        "bing_visual_search": f"https://www.bing.com/images/search?q=imgurl:{encoded}&view=detailv2&iss=sbi",
         "yandex_images": f"https://yandex.com/images/search?rpt=imageview&url={encoded}",
-        "tineye": f"https://tineye.com/search?url={encoded}",
+        "tineye": f"https://tineye.com/search/?url={encoded}",
         "note": (
             "These open each provider's reverse-image search pre-loaded with "
             "this image. The link is single-use-ish: it embeds a signed token "

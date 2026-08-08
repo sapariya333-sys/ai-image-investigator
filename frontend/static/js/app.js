@@ -216,6 +216,7 @@ async function removeEvidence(imageId) {
 function applyTiltEffect(container) {
   container.querySelectorAll(".evidence-card").forEach((card) => {
     card.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "touch") return;
       const rect = card.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width - 0.5;
       const y = (e.clientY - rect.top) / rect.height - 0.5;
@@ -336,11 +337,44 @@ async function loadSearchLinks(imageId) {
   const r = await api(`/analysis/${imageId}/reverse-search-links`);
   const links = { ...r };
   const note = links.note;
+  const imageUrl = links.image_url;
   delete links.note;
+  delete links.image_url;
+
   document.getElementById("searchLinks").innerHTML = Object.entries(links)
     .map(([k, v]) => `<a href="${encodeURI(v)}" target="_blank" rel="noopener">${escapeHtml(k.replace(/_/g, " "))}</a>`)
     .join("");
   document.getElementById("searchNote").textContent = note;
+
+  const previewEl = document.getElementById("searchPreview");
+  previewEl.innerHTML = `
+    <div class="search-preview-row">
+      <img id="searchPreviewImg" class="search-preview-thumb" src="${encodeURI(imageUrl)}" />
+      <div class="search-preview-info">
+        <div class="search-preview-status" id="searchPreviewStatus">Loading preview…</div>
+        <div class="search-preview-url">${escapeHtml(imageUrl)}</div>
+        <button class="btn-action" id="btnCopyPublicLink">Copy Link</button>
+      </div>
+    </div>
+  `;
+  const img = document.getElementById("searchPreviewImg");
+  const status = document.getElementById("searchPreviewStatus");
+  img.onload = () => {
+    status.textContent = "✓ Reachable — this is what search providers will fetch.";
+    status.className = "search-preview-status search-preview-ok";
+  };
+  img.onerror = () => {
+    status.textContent = "✗ This URL did not load. Reverse search will fail until this is reachable from outside your network — check your host's public URL/HTTPS setup.";
+    status.className = "search-preview-status search-preview-fail";
+  };
+  document.getElementById("btnCopyPublicLink").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(imageUrl);
+      toast("Link copied");
+    } catch {
+      toast("Could not copy — select and copy the URL manually", true);
+    }
+  });
 }
 
 // ---------- similarity tab ----------
@@ -463,9 +497,30 @@ function initTabs() {
   });
 }
 
+// ---------- mobile nav ----------
+function initMobileNav() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const menuBtn = document.getElementById("btnMobileMenu");
+
+  const open = () => { sidebar.classList.add("open"); overlay.classList.add("visible"); };
+  const close = () => { sidebar.classList.remove("open"); overlay.classList.remove("visible"); };
+
+  menuBtn.addEventListener("click", () => {
+    sidebar.classList.contains("open") ? close() : open();
+  });
+  overlay.addEventListener("click", close);
+
+  // auto-close after picking a case on mobile
+  sidebar.addEventListener("click", (e) => {
+    if (e.target.closest(".case-item") && window.innerWidth <= 900) close();
+  });
+}
+
 // ---------- wire up ----------
 function init() {
   initTabs();
+  initMobileNav();
   loadCases();
 
   document.getElementById("btnNewCase").addEventListener("click", createCase);

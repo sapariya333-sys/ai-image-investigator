@@ -135,7 +135,20 @@ def reverse_search_links(image_id):
     image = _get_image_or_404(image_id)
     if not image:
         return jsonify({"error": "not found"}), 404
-    base = request.host_url.rstrip("/")
+
+    # Almost every hosting platform terminates TLS at an edge/proxy and
+    # forwards plain HTTP internally. request.host_url reflects that
+    # internal scheme unless the proxy's X-Forwarded-Proto header is both
+    # sent AND correctly trusted by ProxyFix's hop count -- which varies
+    # per platform and is easy to get wrong. Since reverse-search providers
+    # fetch this URL from their own servers (not the investigator's
+    # browser), a scheme mismatch means a silent failure with no visible
+    # error. Forcing https for any non-local host sidesteps that entirely.
+    host = request.host
+    is_local = host.startswith("localhost") or host.startswith("127.0.0.1")
+    scheme = request.scheme if is_local else "https"
+    base = f"{scheme}://{host}"
+
     token = URLSafeTimedSerializer(current_app.secret_key, salt="public-image-link").dumps(image_id)
     public_url = f"{base}/api/images/{image_id}/public-file?token={token}"
     return jsonify(reverse_search_service.build_search_links(public_url))

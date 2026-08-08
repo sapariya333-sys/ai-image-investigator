@@ -116,6 +116,16 @@ def create_app():
     app.register_blueprint(analysis_bp, url_prefix="/api/analysis")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
 
+    @app.context_processor
+    def inject_asset_version():
+        def asset_version(rel_path):
+            full_path = os.path.join(app.static_folder, rel_path)
+            try:
+                return int(os.path.getmtime(full_path))
+            except OSError:
+                return 0
+        return {"asset_version": asset_version}
+
     @app.route("/")
     def index():
         return render_template("index.html")
