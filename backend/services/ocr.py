@@ -43,8 +43,18 @@ def run_ocr(path):
     image = _normalize_for_ocr(path)
     try:
         text = pytesseract.image_to_string(image, lang=LANG_STRING)
+    except pytesseract.TesseractNotFoundError as e:
+        raise RuntimeError(
+            "The Tesseract OCR engine isn't installed on this server (only the "
+            "pytesseract Python wrapper was). This happens when a host installs "
+            "Python dependencies via pip but skips system packages -- Tesseract "
+            "is a native binary, not a pip package. Deploy via the project's "
+            "Dockerfile (which installs tesseract-ocr + language packs at the "
+            "OS level), or install it manually: `apt-get install tesseract-ocr "
+            "tesseract-ocr-hin tesseract-ocr-guj` on the host."
+        ) from e
     except pytesseract.TesseractError:
-        # fall back to English-only if a language pack is unavailable
+        # a specific language pack (hin/guj) is likely missing -- fall back to English
         text = pytesseract.image_to_string(image, lang="eng")
 
     text = text.strip()

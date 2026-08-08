@@ -2,6 +2,7 @@ import os
 import uuid
 from flask import Blueprint, request, jsonify, current_app, send_file
 from werkzeug.utils import secure_filename
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from PIL import Image
 
 from db import query
@@ -117,6 +118,38 @@ def get_image_file(image_id):
     return send_file(image["stored_path"])
 
 
+@images_bp.route("/<int:image_id>/public-file", methods=["GET"])
+def get_public_image_file(image_id):
+    """
+    Serves the image WITHOUT requiring a login session -- exempted from
+    the global auth check in app.py (any path ending in /public-file).
+
+    This exists only for reverse-image-search providers (Google Lens,
+    Bing, etc.), which fetch the URL from their own servers and so can
+    never carry our session cookie. Access requires a signed,
+    15-minute token minted specifically for this image (see
+    routes/analysis.py reverse_search_links) -- so it's not a
+    permanently open evidence URL, just a short window for one lookup.
+    """
+    token = request.args.get("token", "")
+    try:
+        payload_image_id = URLSafeTimedSerializer(
+            current_app.secret_key, salt="public-image-link"
+        ).loads(token, max_age=900)
+    except SignatureExpired:
+        return jsonify({"error": "this link has expired — generate a new one from the Search tab"}), 403
+    except BadSignature:
+        return jsonify({"error": "invalid link"}), 403
+
+    if payload_image_id != image_id:
+        return jsonify({"error": "invalid link"}), 403
+
+    image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
+    if not image:
+        return jsonify({"error": "not found"}), 404
+    return send_file(image["stored_path"])
+
+
 @images_bp.route("/<int:image_id>/enhance", methods=["POST"])
 def enhance_image(image_id):
     image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
@@ -152,6 +185,44 @@ def enhance_image(image_id):
     )
     derivative = query("SELECT * FROM derivatives WHERE id = ?", (deriv_id,), fetchone=True)
     return jsonify(derivative), 201
+
+
+@images_bp.route("/<int:image_id>", methods=["DELETE"])
+def delete_image(image_id):
+    image = query("SELECT * FROM images WHERE id = ?", (image_id,), fetchone=True)
+    if not image:
+        return jsonify({"error": "not found"}), 404
+
+    derivatives = query("SELECT * FROM derivatives WHERE image_id = ?", (image_id,), fetchall=True)
+    for d in derivatives:
+        try:
+            if d["stored_path"] and os.path.exists(d["stored_path"]):
+                os.remove(d["stored_path"])
+        except OSError:
+            pass
+
+    try:
+        if image["stored_path"] and os.path.exists(image["stored_path"]):
+            os.remove(image["stored_path"])
+    except OSError:
+        pass
+
+    # manual cascade -- SQLite doesn't auto-cascade unless the FK was
+    # declared with ON DELETE CASCADE, which ours weren't.
+    for table in (
+        "metadata_findings", "ocr_results", "manipulation_findings",
+        "derivatives", "timeline_events", "investigator_notes",
+    ):
+        query(f"DELETE FROM {table} WHERE image_id = ?", (image_id,), commit=True)
+
+    query(
+        "INSERT INTO timeline_events (case_id, image_id, event_time, event_label, source_field) VALUES (?,?,?,?,?)",
+        (image["case_id"], None, None, f"Evidence removed from case: {image['original_filename']}", "system"),
+        commit=True,
+    )
+    query("DELETE FROM images WHERE id = ?", (image_id,), commit=True)
+
+    return jsonify({"deleted": True, "image_id": image_id}), 200
 
 
 @images_bp.route("/derivatives/<int:derivative_id>/file", methods=["GET"])

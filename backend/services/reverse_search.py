@@ -13,17 +13,21 @@ use. This keeps the module honest about what is automated (link
 construction) versus what still needs a provider integration
 (fetching results back into the platform).
 """
+from urllib.parse import quote
 
 
 def build_search_links(public_image_url):
+    encoded = quote(public_image_url, safe="")
     return {
-        "google_lens": f"https://lens.google.com/uploadbyurl?url={public_image_url}",
-        "bing_visual_search": f"https://www.bing.com/images/search?view=detailv2&iss=sbiupload&q=imgurl:{public_image_url}",
-        "yandex_images": f"https://yandex.com/images/search?rpt=imageview&url={public_image_url}",
-        "tineye": f"https://tineye.com/search?url={public_image_url}",
+        "google_lens": f"https://lens.google.com/uploadbyurl?url={encoded}",
+        "bing_visual_search": f"https://www.bing.com/images/search?view=detailv2&iss=sbiupload&q=imgurl:{encoded}",
+        "yandex_images": f"https://yandex.com/images/search?rpt=imageview&url={encoded}",
+        "tineye": f"https://tineye.com/search?url={encoded}",
         "note": (
             "These open each provider's reverse-image search pre-loaded with "
-            "this image. Full in-platform result ingestion requires that "
-            "provider's API key — see README for configuration."
+            "this image. The link is single-use-ish: it embeds a signed token "
+            "that expires after 15 minutes, so if a search comes back empty, "
+            "generate a fresh link and try again. Full in-platform result "
+            "ingestion requires that provider's API key — see README."
         ),
     }

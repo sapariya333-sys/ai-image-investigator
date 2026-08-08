@@ -1,6 +1,7 @@
 import os
 import uuid
 from flask import Blueprint, jsonify, current_app, request
+from itsdangerous import URLSafeTimedSerializer
 
 from db import query
 from services import ocr as ocr_service
@@ -25,7 +26,11 @@ def run_ocr(image_id):
     if not image:
         return jsonify({"error": "not found"}), 404
 
-    result = ocr_service.run_ocr(image["stored_path"])
+    try:
+        result = ocr_service.run_ocr(image["stored_path"])
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
     query(
         "INSERT INTO ocr_results (image_id, language, extracted_text, confidence) VALUES (?,?,?,?)",
         (image_id, result["language"], result["extracted_text"], None),
@@ -131,5 +136,6 @@ def reverse_search_links(image_id):
     if not image:
         return jsonify({"error": "not found"}), 404
     base = request.host_url.rstrip("/")
-    public_url = f"{base}/api/images/{image_id}/file"
+    token = URLSafeTimedSerializer(current_app.secret_key, salt="public-image-link").dumps(image_id)
+    public_url = f"{base}/api/images/{image_id}/public-file?token={token}"
     return jsonify(reverse_search_service.build_search_links(public_url))

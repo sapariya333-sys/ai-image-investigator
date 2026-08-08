@@ -124,6 +124,27 @@ function renderCaseHeader() {
   document.getElementById("caseTitleLabel").textContent = c.title;
   document.getElementById("caseMetaLabel").textContent =
     `Investigator: ${c.investigator || "—"} · Status: ${c.status} · Opened: ${c.created_at}`;
+
+  const btn = document.getElementById("btnToggleStatus");
+  const isOpen = c.status === "open";
+  btn.textContent = isOpen ? "Close Case" : "Reopen Case";
+  btn.className = isOpen ? "btn-status btn-status-close" : "btn-status btn-status-reopen";
+}
+
+async function toggleCaseStatus() {
+  const newStatus = state.activeCase.status === "open" ? "closed" : "open";
+  try {
+    const updated = await api(`/cases/${state.activeCase.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: newStatus }),
+    });
+    state.activeCase = { ...state.activeCase, ...updated };
+    renderCaseHeader();
+    renderCaseList();
+    toast(newStatus === "closed" ? "Case closed" : "Case reopened");
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 function renderOverview() {
@@ -151,8 +172,11 @@ function renderImageGrid() {
   grid.innerHTML = state.images
     .map(
       (img) => `
-    <div class="evidence-card">
-      <img class="evidence-thumb" src="${API}/images/${img.id}/file" loading="lazy" />
+    <div class="evidence-card" data-image-id="${img.id}">
+      <button class="btn-remove-evidence" data-image-id="${img.id}" title="Remove this evidence">✕</button>
+      <div class="evidence-thumb-wrap">
+        <img class="evidence-thumb" src="${API}/images/${img.id}/file" loading="lazy" />
+      </div>
       <div class="evidence-info">
         <div class="evidence-name">${escapeHtml(img.original_filename)}</div>
         <div class="evidence-hash">${escapeHtml(img.sha256)}</div>
@@ -161,6 +185,46 @@ function renderImageGrid() {
     </div>`
     )
     .join("");
+
+  grid.querySelectorAll(".btn-remove-evidence").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeEvidence(parseInt(btn.dataset.imageId));
+    });
+  });
+
+  applyTiltEffect(grid);
+}
+
+async function removeEvidence(imageId) {
+  const img = state.images.find((i) => i.id === imageId);
+  const label = img ? img.original_filename : "this evidence";
+  if (!confirm(`Remove "${label}" from this case? This deletes the file and all analysis results for it. This cannot be undone.`)) {
+    return;
+  }
+  try {
+    await api(`/images/${imageId}`, { method: "DELETE" });
+    await openCase(state.activeCase.id);
+    toast("Evidence removed");
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+// Subtle pointer-tracked 3D tilt on evidence cards -- purely cosmetic,
+// degrades silently to a flat card if pointer events aren't available.
+function applyTiltEffect(container) {
+  container.querySelectorAll(".evidence-card").forEach((card) => {
+    card.addEventListener("pointermove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      card.style.transform = `perspective(700px) rotateY(${x * 8}deg) rotateX(${-y * 8}deg) translateZ(4px)`;
+    });
+    card.addEventListener("pointerleave", () => {
+      card.style.transform = "";
+    });
+  });
 }
 
 function populateImageSelectors() {
@@ -405,6 +469,7 @@ function init() {
   loadCases();
 
   document.getElementById("btnNewCase").addEventListener("click", createCase);
+  document.getElementById("btnToggleStatus").addEventListener("click", toggleCaseStatus);
 
   document.getElementById("fileInput").addEventListener("change", (e) => {
     if (e.target.files[0]) handleUpload(e.target.files[0]);

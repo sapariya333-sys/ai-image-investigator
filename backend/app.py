@@ -7,6 +7,7 @@ import secrets
 from functools import wraps
 from flask import Flask, jsonify, request, session, redirect, url_for, render_template
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 import pillow_heif
 
 pillow_heif.register_heif_opener()  # makes PIL.Image.open() handle .heic/.heif
@@ -36,6 +37,8 @@ def create_app():
         static_folder=os.path.join(BASE_DIR, "..", "frontend", "static"),
         template_folder=os.path.join(BASE_DIR, "..", "frontend", "templates"),
     )
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+
     app.config["UPLOAD_DIR"] = UPLOAD_DIR
     app.config["DERIVATIVE_DIR"] = DERIVATIVE_DIR
     app.config["REPORT_DIR"] = REPORT_DIR
@@ -61,6 +64,15 @@ def create_app():
     CORS(app, supports_credentials=True)
     init_db()
 
+    def _is_exempt(path):
+        if path.startswith("/login") or path.startswith("/static/"):
+            return True
+        # token-gated route used by external reverse-search providers --
+        # authenticated via its own signed token, not a session
+        if path.endswith("/public-file"):
+            return True
+        return False
+
     def login_required(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
@@ -73,8 +85,7 @@ def create_app():
 
     @app.before_request
     def enforce_login():
-        exempt = ("/login", "/static/")
-        if request.path.startswith(exempt):
+        if _is_exempt(request.path):
             return None
         if not session.get("authenticated"):
             if request.path.startswith("/api/"):
