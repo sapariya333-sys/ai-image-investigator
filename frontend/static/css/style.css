@@ -44,6 +44,39 @@ html, body {
   font-family: var(--sans);
   font-size: 14px;
   height: 100%;
+  overflow: hidden;
+}
+
+/* Ambient floating orbs + faint grid texture for atmospheric depth.
+   Fixed, behind everything, ignored by pointer events -- purely decorative. */
+.bg-atmosphere {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+}
+.bg-atmosphere::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 60% at 30% 0%, black, transparent 75%);
+}
+.bg-orb {
+  position: absolute; border-radius: 50%; filter: blur(90px);
+  animation: orbFloat 22s ease-in-out infinite;
+}
+.bg-orb-1 { width: 480px; height: 480px; top: -160px; left: -120px; background: rgba(79,134,198,.16); }
+.bg-orb-2 { width: 420px; height: 420px; bottom: -180px; right: -100px; background: rgba(201,146,47,.10); animation-duration: 28s; animation-delay: -6s; }
+.bg-orb-3 { width: 320px; height: 320px; top: 40%; right: 10%; background: rgba(79,157,110,.07); animation-duration: 34s; animation-delay: -14s; }
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -24px) scale(1.06); }
+  66% { transform: translate(-22px, 18px) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-orb { animation: none; }
 }
 
 .hidden { display: none !important; }
@@ -130,7 +163,18 @@ html, body {
   background: var(--bg-1);
   box-shadow: var(--shadow-sm);
   transition: transform .12s ease, box-shadow .12s ease, border-color .15s, background .15s;
+  position: relative;
 }
+.case-item::before, .case-item::after {
+  content: "";
+  position: absolute; left: 4px; right: 4px; border-radius: var(--radius-sm);
+  background: var(--bg-2); border: 1px solid var(--border-soft);
+  z-index: -1; transition: transform .15s ease, opacity .15s ease;
+}
+.case-item::before { bottom: -3px; height: 100%; opacity: .7; }
+.case-item::after { bottom: -6px; left: 8px; right: 8px; height: 100%; opacity: .4; }
+.case-item:hover::before { transform: translateY(1px); }
+.case-item:hover::after { transform: translateY(2px); }
 .case-item:hover { background: var(--bg-2); transform: translateX(2px); box-shadow: var(--shadow-md); }
 .case-item.active {
   background: linear-gradient(135deg, var(--bg-3), var(--bg-elevated));
@@ -152,7 +196,7 @@ html, body {
 .btn-logout:hover { border-color: var(--red); color: var(--red); transform: translateY(-1px); }
 
 /* ============ MAIN ============ */
-.main { overflow-y: auto; padding: 0; position: relative; }
+.main { overflow-y: auto; padding: 0; position: relative; z-index: 1; }
 
 .empty-state {
   height: 100%;
@@ -218,28 +262,31 @@ html, body {
 .btn-upload:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg), var(--shadow-glow); }
 .btn-upload:active { transform: translateY(0); }
 
-/* Tabs */
+/* Tabs -- sliding pill indicator */
 .tabs {
   display: flex; gap: 2px; overflow-x: auto;
   border-bottom: 1px solid var(--border-soft);
   margin-bottom: 22px;
+  position: relative;
+  padding-bottom: 2px;
+}
+.tab-indicator {
+  position: absolute; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+  box-shadow: 0 0 12px var(--accent-hi), 0 0 4px var(--accent-hi);
+  border-radius: 2px;
+  transition: left .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
 }
 .tab {
   background: transparent; border: none; color: var(--text-low);
   padding: 11px 15px; font-size: 12.5px; cursor: pointer;
-  border-bottom: 2px solid transparent;
   font-family: var(--sans); white-space: nowrap; font-weight: 500;
   transition: color .15s;
   position: relative;
 }
 .tab:hover { color: var(--text-hi); }
-.tab.active { color: var(--accent-hi); border-bottom-color: var(--accent); }
-.tab.active::after {
-  content: "";
-  position: absolute; left: 10%; right: 10%; bottom: -2px; height: 2px;
-  background: var(--accent-hi);
-  box-shadow: 0 0 10px var(--accent-hi);
-}
+.tab.active { color: var(--accent-hi); }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeUp .2s ease; }
@@ -337,6 +384,17 @@ html, body {
   box-shadow: var(--shadow-md);
   transition: box-shadow .15s ease, transform .05s linear;
   transform-style: preserve-3d;
+  animation: cardPop .35s ease backwards;
+}
+.image-grid .evidence-card:nth-child(1) { animation-delay: .02s; }
+.image-grid .evidence-card:nth-child(2) { animation-delay: .06s; }
+.image-grid .evidence-card:nth-child(3) { animation-delay: .10s; }
+.image-grid .evidence-card:nth-child(4) { animation-delay: .14s; }
+.image-grid .evidence-card:nth-child(n+5) { animation-delay: .18s; }
+
+@keyframes cardPop {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .evidence-card:hover { box-shadow: var(--shadow-lg), var(--shadow-glow); }
 .evidence-thumb-wrap { overflow: hidden; background: var(--bg-0); }
@@ -385,11 +443,19 @@ html, body {
 .derivatives-list { display: flex; flex-wrap: wrap; gap: 12px; }
 .derivative-item {
   background: var(--bg-3); border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
-  padding: 9px; width: 160px; box-shadow: var(--shadow-sm);
+  padding: 9px; width: 200px; box-shadow: var(--shadow-sm);
 }
 .derivative-item img { width: 100%; border-radius: 3px; margin-bottom: 6px; }
 .derivative-item .label { font-size: 11px; color: var(--text-mid); }
-.derivative-item .hash { font-family: var(--mono); font-size: 9px; color: var(--text-low); word-break: break-all; }
+.derivative-item .hash { font-family: var(--mono); font-size: 9px; color: var(--text-low); word-break: break-all; margin-bottom: 8px; }
+.btn-derivative-ocr { width: 100%; font-size: 11px; padding: 7px 10px; }
+.derivative-ocr-result { margin-top: 8px; }
+.derivative-ocr-text {
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-hi);
+  background: var(--bg-0); padding: 8px; border-radius: 3px; border: 1px solid var(--border-soft);
+  white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto;
+}
+.derivative-ocr-empty { color: var(--text-low); font-style: italic; }
 
 .timeline { position: relative; padding-left: 22px; }
 .timeline::before { content: ""; position: absolute; left: 5px; top: 4px; bottom: 4px; width: 1px; background: var(--border); }

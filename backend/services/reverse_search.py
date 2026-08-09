@@ -28,7 +28,11 @@ def build_search_links(public_image_url):
             "These open each provider's reverse-image search pre-loaded with "
             "this image. The link is single-use-ish: it embeds a signed token "
             "that expires after 15 minutes, so if a search comes back empty, "
-            "generate a fresh link and try again. Full in-platform result "
-            "ingestion requires that provider's API key — see README."
+            "generate a fresh link and try again. If you're on a free-tier host "
+            "that sleeps when idle (Render, etc.), the provider's fetch can "
+            "time out during cold-start — open the Public Link Preview above "
+            "first to wake the server, then try the provider links. Full "
+            "in-platform result ingestion requires that provider's API key — "
+            "see README."
         ),
     }

@@ -32,8 +32,34 @@ def run_ocr(image_id):
         return jsonify({"error": str(e)}), 500
 
     query(
-        "INSERT INTO ocr_results (image_id, language, extracted_text, confidence) VALUES (?,?,?,?)",
-        (image_id, result["language"], result["extracted_text"], None),
+        "INSERT INTO ocr_results (image_id, derivative_id, language, extracted_text, confidence) VALUES (?,?,?,?,?)",
+        (image_id, None, result["language"], result["extracted_text"], None),
+        commit=True,
+    )
+    return jsonify(result)
+
+
+@analysis_bp.route("/derivatives/<int:derivative_id>/ocr", methods=["POST"])
+def run_ocr_on_derivative(derivative_id):
+    """
+    Runs OCR against an enhancement derivative rather than the original --
+    the whole point of presets like Enhance Number Plate / Enhance Text is
+    to make text legible that the original photo doesn't OCR cleanly, so
+    the investigator needs to be able to re-run OCR against the enhanced
+    version, not just the original.
+    """
+    derivative = query("SELECT * FROM derivatives WHERE id = ?", (derivative_id,), fetchone=True)
+    if not derivative:
+        return jsonify({"error": "not found"}), 404
+
+    try:
+        result = ocr_service.run_ocr(derivative["stored_path"])
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    query(
+        "INSERT INTO ocr_results (image_id, derivative_id, language, extracted_text, confidence) VALUES (?,?,?,?,?)",
+        (derivative["image_id"], derivative_id, result["language"], result["extracted_text"], None),
         commit=True,
     )
     return jsonify(result)

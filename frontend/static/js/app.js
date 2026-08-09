@@ -115,6 +115,7 @@ async function openCase(caseId) {
   populateImageSelectors();
   renderTimeline();
   renderNotes();
+  requestAnimationFrame(() => positionTabIndicator(document.querySelector(".tab.active")));
 }
 
 function renderCaseHeader() {
@@ -349,24 +350,14 @@ async function loadSearchLinks(imageId) {
   const previewEl = document.getElementById("searchPreview");
   previewEl.innerHTML = `
     <div class="search-preview-row">
-      <img id="searchPreviewImg" class="search-preview-thumb" src="${encodeURI(imageUrl)}" />
+      <img id="searchPreviewImg" class="search-preview-thumb" src="" />
       <div class="search-preview-info">
-        <div class="search-preview-status" id="searchPreviewStatus">Loading preview…</div>
+        <div class="search-preview-status" id="searchPreviewStatus">Checking reachability…</div>
         <div class="search-preview-url">${escapeHtml(imageUrl)}</div>
         <button class="btn-action" id="btnCopyPublicLink">Copy Link</button>
       </div>
     </div>
   `;
-  const img = document.getElementById("searchPreviewImg");
-  const status = document.getElementById("searchPreviewStatus");
-  img.onload = () => {
-    status.textContent = "✓ Reachable — this is what search providers will fetch.";
-    status.className = "search-preview-status search-preview-ok";
-  };
-  img.onerror = () => {
-    status.textContent = "✗ This URL did not load. Reverse search will fail until this is reachable from outside your network — check your host's public URL/HTTPS setup.";
-    status.className = "search-preview-status search-preview-fail";
-  };
   document.getElementById("btnCopyPublicLink").addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(imageUrl);
@@ -375,6 +366,35 @@ async function loadSearchLinks(imageId) {
       toast("Could not copy — select and copy the URL manually", true);
     }
   });
+
+  const status = document.getElementById("searchPreviewStatus");
+  const img = document.getElementById("searchPreviewImg");
+
+  // Actually fetch the URL (not just an <img> tag) so a failure shows the
+  // real HTTP status and error body, not just "it didn't load" -- an <img>
+  // onerror event can't tell you WHY it failed.
+  try {
+    const resp = await fetch(imageUrl);
+    if (resp.ok) {
+      const blob = await resp.blob();
+      img.src = URL.createObjectURL(blob);
+      status.textContent = `✓ Reachable (HTTP ${resp.status}, ${resp.headers.get("content-type") || "unknown type"}) — this is what search providers will fetch.`;
+      status.className = "search-preview-status search-preview-ok";
+    } else {
+      let detail = "";
+      try {
+        const body = await resp.json();
+        detail = body.error || "";
+      } catch {
+        detail = await resp.text().catch(() => "");
+      }
+      status.textContent = `✗ HTTP ${resp.status}${detail ? " — " + detail : ""}. Reverse search will fail until this is fixed.`;
+      status.className = "search-preview-status search-preview-fail";
+    }
+  } catch (e) {
+    status.textContent = `✗ Network error fetching this URL from your own browser: ${e.message}. If this fails even for you, external providers have no chance — check your host's public URL/HTTPS setup.`;
+    status.className = "search-preview-status search-preview-fail";
+  }
 }
 
 // ---------- similarity tab ----------
@@ -432,14 +452,33 @@ async function loadDerivatives(imageId) {
     ? img.derivatives
         .map(
           (d) => `
-      <div class="derivative-item">
+      <div class="derivative-item" data-derivative-id="${d.id}">
         <img src="${API}/images/derivatives/${d.id}/file" />
         <div class="label">${escapeHtml(d.label)}</div>
         <div class="hash">${escapeHtml(d.sha256)}</div>
+        <button class="btn-preset btn-derivative-ocr" data-derivative-id="${d.id}">Run OCR on this</button>
+        <div class="derivative-ocr-result" id="derivOcr-${d.id}"></div>
       </div>`
         )
         .join("")
     : `<div class="empty-note">No derivatives generated yet.</div>`;
+
+  document.querySelectorAll(".btn-derivative-ocr").forEach((btn) => {
+    btn.addEventListener("click", () => runDerivativeOcr(btn.dataset.derivativeId));
+  });
+}
+
+async function runDerivativeOcr(derivativeId) {
+  const resultEl = document.getElementById(`derivOcr-${derivativeId}`);
+  resultEl.textContent = "Running OCR…";
+  try {
+    const r = await api(`/analysis/derivatives/${derivativeId}/ocr`, { method: "POST" });
+    resultEl.innerHTML = r.extracted_text
+      ? `<div class="derivative-ocr-text">${escapeHtml(r.extracted_text)}</div>`
+      : `<div class="derivative-ocr-text derivative-ocr-empty">No text detected.</div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div class="derivative-ocr-text derivative-ocr-empty">${escapeHtml(e.message)}</div>`;
+  }
 }
 
 // ---------- timeline / notes ----------
@@ -486,14 +525,30 @@ async function generateReport(imageId) {
 }
 
 // ---------- tabs ----------
+function positionTabIndicator(tabEl) {
+  const indicator = document.getElementById("tabIndicator");
+  if (!indicator || !tabEl) return;
+  indicator.style.left = `${tabEl.offsetLeft}px`;
+  indicator.style.width = `${tabEl.offsetWidth}px`;
+}
+
 function initTabs() {
+  const tabsContainer = document.getElementById("tabs");
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
       tab.classList.add("active");
       document.getElementById(`panel-${tab.dataset.tab}`).classList.add("active");
+      positionTabIndicator(tab);
     });
+  });
+  const initial = document.querySelector(".tab.active") || document.querySelector(".tab");
+  // requestAnimationFrame so layout has settled before measuring offsetLeft/Width
+  requestAnimationFrame(() => positionTabIndicator(initial));
+  window.addEventListener("resize", () => {
+    const active = document.querySelector(".tab.active");
+    positionTabIndicator(active);
   });
 }
 

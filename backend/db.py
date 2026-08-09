@@ -54,10 +54,12 @@ CREATE TABLE IF NOT EXISTS metadata_findings (
 CREATE TABLE IF NOT EXISTS ocr_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     image_id INTEGER NOT NULL,
+    derivative_id INTEGER,        -- NULL = ran on the original evidence file
     language TEXT,
     extracted_text TEXT,
     confidence REAL,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id),
+    FOREIGN KEY (derivative_id) REFERENCES derivatives(id)
 );
 
 CREATE TABLE IF NOT EXISTS manipulation_findings (
